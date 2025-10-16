@@ -32,9 +32,22 @@ def main():
     messages = [
         types.Content(role="user", parts=[types.Part(text=user_prompt)]),
     ]
-    
-    generate_content(client, messages, verbose)
 
+    iters = 0
+    while True:
+        iters += 1
+        if iters > MAX_ITERATIONS:
+            print(f"Maximum iterations ({MAX_ITERATIONS}) reached.")
+            sys.exit(1)
+
+        try:
+            final_response = generate_content(client, messages, verbose)
+            if final_response:
+                print("Final response:")
+                print(final_response)
+                break
+        except Exception as e:
+            print(f"Error in generate_content: {e}")
 
 def generate_content(client, messages, verbose):    
     response = client.models.generate_content(
@@ -50,13 +63,26 @@ def generate_content(client, messages, verbose):
     if not response.function_calls:
         return response.text
 
-    for function_call in response.function_calls:
-        result = call_function(function_call, verbose)
-        if not result.parts[0].function_response.response:
-            raise Exception("Error: fatal exception in response to function call - no response.")
+    function_responses = []
+    for function_call_part in response.function_calls:
+        function_call_result = call_function(function_call_part, verbose)
+        if (
+            not function_call_result.parts
+            or not function_call_result.parts[0].function_response
+        ):
+            raise Exception("empty function call result")
         if verbose:
-            print(f"-> {result.parts[0].function_response.response}")
-        return result
+            print(f"-> {function_call_result.parts[0].function_response.response}")
+        func_resp = str(function_call_result.parts[0])
+        function_responses.append(func_resp)
+        content = types.Content(role="user", parts=[types.Part(text=func_resp)])
+        messages.append(content)
+    if not function_responses:
+        raise Exception("no function responses generated, exiting.")
+    
+    for candidate in response.candidates:
+        messages.append(candidate.content)
+
 
 
 if __name__ == "__main__":

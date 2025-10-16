@@ -14,3 +14,5 @@ All paths you provide should be relative to the working directory. You do not ne
 """
 
 WORKING_DIRECTORY = "./calculator"
+
+MAX_ITERATIONS = 20
